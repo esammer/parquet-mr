@@ -44,6 +44,8 @@ import parquet.thrift.struct.ThriftTypeID;
  */
 public class BufferedProtocolReadToWrite implements ProtocolPipe {
 
+  private ReadWriteErrorHandler errorHandler;
+
   private interface Action {
     void write(TProtocol out) throws TException;
     String toDebugString();
@@ -113,6 +115,10 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     this.thriftType = thriftType;
   }
 
+  public void registerErrorHandler(ReadWriteErrorHandler errorHandler){
+    this.errorHandler=errorHandler;
+  }
+
   /**
    * reads one record from in and writes it to out
    * An Exception can be used to skip a bad record
@@ -127,6 +133,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     try {
       readOneStruct(in, buffer, thriftType);
     } catch (Exception e) {
+      IGNORED_RECORDS_TYPE.CORRUPT.incrIgnoredRecordsCount();  //TODO notify handler about corrupted record
       throw new SkippableException(error("Error while reading", buffer), e);
     }
     try {
@@ -148,7 +155,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
 
   private void readOneValue(TProtocol in, byte type, List<Action> buffer, ThriftType expectedType)
       throws TException {
-    if (expectedType.getType().getSerializedThriftType() != type) {
+    if (expectedType != null && expectedType.getType().getSerializedThriftType() != type) {
       throw new TException("the data type does not match the expected thrift structure: expected " + expectedType + " got " + typeName(type));
     }
     switch (type) {
@@ -288,6 +295,12 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     TField field;
     while ((field = in.readFieldBegin()).type != TType.STOP) {
       final TField currentField = field;
+      if(field.id >= type.getChildren().size()) {
+        IGNORED_RECORDS_TYPE.EXTRA_FIELD.incrIgnoredRecordsCount(); //TODO: notify handler a fields are getting ignored
+        // just consume the field and ignore it
+        readOneValue(in, field.type, new LinkedList<Action>(), null);
+        continue;
+      }
       buffer.add(new Action() {
         @Override
         public void write(TProtocol out) throws TException {
