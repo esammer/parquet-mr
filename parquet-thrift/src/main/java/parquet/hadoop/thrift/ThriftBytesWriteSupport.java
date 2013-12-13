@@ -16,6 +16,7 @@
 package parquet.hadoop.thrift;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Constructor;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
@@ -41,6 +42,7 @@ import parquet.thrift.struct.ThriftType.StructType;
 
 public class ThriftBytesWriteSupport extends WriteSupport<BytesWritable> {
   private static final String PARQUET_PROTOCOL_CLASS = "parquet.protocol.class";
+  private static final String ERROR_HANDLER_CLASS = "parquet.error.handler.class";
 
   public static <U extends TProtocol> void setTProtocolClass(Configuration conf, Class<U> tProtocolClass) {
     conf.set(PARQUET_PROTOCOL_CLASS, tProtocolClass.getName());
@@ -101,11 +103,25 @@ public class ThriftBytesWriteSupport extends WriteSupport<BytesWritable> {
     this.thriftStruct = thriftSchemaConverter.toStructType(thriftClass);
     this.schema = thriftSchemaConverter.convert(thriftClass);
     if (buffered) {
-      readToWrite = new BufferedProtocolReadToWrite(thriftStruct);
+      BufferedProtocolReadToWrite bufferedProtocolReadToWrite = new BufferedProtocolReadToWrite(thriftStruct);
+      bufferedProtocolReadToWrite.registerErrorHandler(getErrorHandler(configuration));
+      readToWrite = bufferedProtocolReadToWrite;
     } else {
       readToWrite = new ProtocolReadToWrite();
     }
     return thriftWriteSupport.init(configuration);
+  }
+
+  private BufferedProtocolReadToWrite.ReadWriteErrorHandler getErrorHandler(Configuration conf) {
+    Class handlerClass= conf.getClass(ERROR_HANDLER_CLASS,BufferedProtocolReadToWrite.DefaultErrorHandler.class);
+    try {
+      Constructor cons = handlerClass.getConstructor(Configuration.class);
+      return (BufferedProtocolReadToWrite.ReadWriteErrorHandler)cons.newInstance(conf);
+    } catch (Exception e) {
+      //TODO: log error and use default handler here
+      return new BufferedProtocolReadToWrite.DefaultErrorHandler(conf);
+    }
+
   }
 
   private TProtocol protocol(BytesWritable record) {

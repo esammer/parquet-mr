@@ -44,13 +44,6 @@ import parquet.thrift.struct.ThriftTypeID;
  */
 public class BufferedProtocolReadToWrite implements ProtocolPipe {
 
-  private ReadWriteErrorHandler errorHandler;
-
-  private interface Action {
-    void write(TProtocol out) throws TException;
-    String toDebugString();
-  }
-
   private static final Action STRUCT_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -63,7 +56,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return ")";
     }
   };
-
   private static final Action FIELD_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -74,7 +66,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return ";";
     }
   };
-
   private static final Action MAP_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -85,7 +76,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return "]";
     }
   };
-
   private static final Action LIST_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -96,7 +86,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return "}";
     }
   };
-
   private static final Action SET_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -107,16 +96,26 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return "*}";
     }
   };
-
   private final StructType thriftType;
+  boolean hasFieldIgnored=false;
+  //error handlers are global
+  private static List<ReadWriteErrorHandler> errorHandlers = new LinkedList<ReadWriteErrorHandler>();
 
   public BufferedProtocolReadToWrite(StructType thriftType) {
     super();
     this.thriftType = thriftType;
   }
 
-  public void registerErrorHandler(ReadWriteErrorHandler errorHandler){
-    this.errorHandler=errorHandler;
+  /**
+   * method chaining style
+   * @param errorHandler
+   */
+  public static void registerErrorHandler(ReadWriteErrorHandler errorHandler){
+   errorHandlers.add(errorHandler);
+  }
+
+  public static void unregisterAllHandlers(){
+   errorHandlers = new LinkedList<ReadWriteErrorHandler>();
   }
 
   /**
@@ -130,11 +129,15 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
   @Override
   public void readOne(TProtocol in, TProtocol out) throws TException {
     List<Action> buffer = new LinkedList<Action>();
+    hasFieldIgnored=false;
     try {
       readOneStruct(in, buffer, thriftType);
+      if (hasFieldIgnored){
+        notifyRecordHasFieldIgnored();
+      }
     } catch (Exception e) {
-      IGNORED_RECORDS_TYPE.CORRUPT.incrIgnoredRecordsCount();  //TODO notify handler about corrupted record
-      throw new SkippableException(error("Error while reading", buffer), e);
+      notifySkippedCorruptedRecord(new SkippableException(error("Error while reading", buffer), e));  //TODO notify handler about corrupted record
+      return;
     }
     try {
       for (Action a : buffer) {
@@ -142,6 +145,24 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       }
     } catch (Exception e) {
       throw new TException(error("Can not write record", buffer),e);
+    }
+  }
+
+  private void notifyRecordHasFieldIgnored() {
+    for (ReadWriteErrorHandler errorHandler : errorHandlers) {
+      errorHandler.handleRecordHasFieldIgnored();
+    }
+  }
+
+  private void notifySkippedCorruptedRecord(RuntimeException e) {
+    for (ReadWriteErrorHandler errorHandler : errorHandlers) {
+      errorHandler.handleSkippedCorruptedRecords(e);
+    }
+  }
+
+  private void notifyIgnoredFieldsOfRecord(TField field) {
+    for (ReadWriteErrorHandler errorHandler : errorHandlers) {
+      errorHandler.handleFieldIgnored(field);
     }
   }
 
@@ -287,18 +308,21 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       public void write(TProtocol out) throws TException {
         out.writeStructBegin(struct);
       }
+
       @Override
       public String toDebugString() {
         return "(";
       }
     });
     TField field;
+
     while ((field = in.readFieldBegin()).type != TType.STOP) {
       final TField currentField = field;
-      if(field.id >= type.getChildren().size()) {
-        IGNORED_RECORDS_TYPE.EXTRA_FIELD.incrIgnoredRecordsCount(); //TODO: notify handler a fields are getting ignored
+      if(field.id > type.getChildren().size()) {
+        notifyIgnoredFieldsOfRecord(field);
         // just consume the field and ignore it
         readOneValue(in, field.type, new LinkedList<Action>(), null);
+        hasFieldIgnored=true;
         continue;
       }
       buffer.add(new Action() {
@@ -331,6 +355,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       public void write(TProtocol out) throws TException {
         out.writeMapBegin(map);
       }
+
       @Override
       public String toDebugString() {
         return "<k=" + map.keyType + ", v=" + map.valueType + ", s=" + map.size + ">[";
@@ -351,6 +376,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       public void write(TProtocol out) throws TException {
         out.writeSetBegin(set);
       }
+
       @Override
       public String toDebugString() {
         return "<e=" + set.elemType + ", s=" + set.size + ">{*";
@@ -368,6 +394,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       public void write(TProtocol out) throws TException {
         out.writeListBegin(list);
       }
+
       @Override
       public String toDebugString() {
         return "<e=" + list.elemType + ", s=" + list.size + ">{";
@@ -385,4 +412,18 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     }
   }
 
+  private interface Action {
+    void write(TProtocol out) throws TException;
+
+    String toDebugString();
+  }
+
+  public static interface ReadWriteErrorHandler {
+    void handleSkippedCorruptedRecords(RuntimeException e);
+
+    void handleRecordHasFieldIgnored();
+
+    void handleFieldIgnored(TField field);
+    // corrupted record: throw new SkippableException(error("Error while reading", buffer), e);
+  }
 }
