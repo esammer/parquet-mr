@@ -121,7 +121,7 @@ public class TestProtocolReadToWrite {
     //handler will rethrow the exception for verifying purpose
     p.registerErrorHandler(new BufferedProtocolReadToWrite.ReadWriteErrorHandler() {
       @Override
-      public void handleSkippedCorruptedRecords(RuntimeException e) {
+      public void handleSkippedCorruptedRecord(SkippableException e) {
        throw e;
       }
       @Override
@@ -151,7 +151,7 @@ public class TestProtocolReadToWrite {
      int fieldIgnoredCount=0;
      int recordCountOfMissingFields=0;
     @Override
-    public void handleSkippedCorruptedRecords(RuntimeException e) {
+    public void handleSkippedCorruptedRecord(SkippableException e) {
       corruptedCount++;
     }
 

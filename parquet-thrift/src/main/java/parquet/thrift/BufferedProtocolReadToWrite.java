@@ -147,9 +147,9 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     }
   }
 
-  private void notifySkippedCorruptedRecord(RuntimeException e) {
+  private void notifySkippedCorruptedRecord(SkippableException e) {
     for (ReadWriteErrorHandler errorHandler : errorHandlers) {
-      errorHandler.handleSkippedCorruptedRecords(e);
+      errorHandler.handleSkippedCorruptedRecord(e);
     }
   }
 
@@ -173,123 +173,123 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       throw new TException("the data type does not match the expected thrift structure: expected " + expectedType + " got " + typeName(type));
     }
     switch (type) {
-      case TType.LIST:
-        readOneList(in, buffer, (ListType) expectedType);
-        break;
-      case TType.MAP:
-        readOneMap(in, buffer, (MapType) expectedType);
-        break;
-      case TType.SET:
-        readOneSet(in, buffer, (SetType) expectedType);
-        break;
-      case TType.STRUCT:
-        readOneStruct(in, buffer, (StructType) expectedType);
-        break;
-      case TType.STOP:
-        break;
-      case TType.BOOL:
-        final boolean bool = in.readBool();
-        buffer.add(new Action() {
-          @Override
-          public void write(TProtocol out) throws TException {
-            out.writeBool(bool);
-          }
+    case TType.LIST:
+      readOneList(in, buffer, (ListType) expectedType);
+      break;
+    case TType.MAP:
+      readOneMap(in, buffer, (MapType) expectedType);
+      break;
+    case TType.SET:
+      readOneSet(in, buffer, (SetType) expectedType);
+      break;
+    case TType.STRUCT:
+      readOneStruct(in, buffer, (StructType) expectedType);
+      break;
+    case TType.STOP:
+      break;
+    case TType.BOOL:
+      final boolean bool = in.readBool();
+      buffer.add(new Action() {
+        @Override
+        public void write(TProtocol out) throws TException {
+          out.writeBool(bool);
+        }
 
-          @Override
-          public String toDebugString() {
-            return String.valueOf(bool);
-          }
-        });
-        break;
-      case TType.BYTE:
-        final byte b = in.readByte();
-        buffer.add(new Action() {
-          @Override
-          public void write(TProtocol out) throws TException {
-            out.writeByte(b);
-          }
+        @Override
+        public String toDebugString() {
+          return String.valueOf(bool);
+        }
+      });
+      break;
+    case TType.BYTE:
+      final byte b = in.readByte();
+      buffer.add(new Action() {
+        @Override
+        public void write(TProtocol out) throws TException {
+          out.writeByte(b);
+        }
 
-          @Override
-          public String toDebugString() {
-            return String.valueOf(b);
-          }
-        });
-        break;
-      case TType.DOUBLE:
-        final double d = in.readDouble();
-        buffer.add(new Action() {
-          @Override
-          public void write(TProtocol out) throws TException {
-            out.writeDouble(d);
-          }
+        @Override
+        public String toDebugString() {
+          return String.valueOf(b);
+        }
+      });
+      break;
+    case TType.DOUBLE:
+      final double d = in.readDouble();
+      buffer.add(new Action() {
+        @Override
+        public void write(TProtocol out) throws TException {
+          out.writeDouble(d);
+        }
 
-          @Override
-          public String toDebugString() {
-            return String.valueOf(d);
-          }
-        });
-        break;
-      case TType.I16:
-        final short s = in.readI16();
-        buffer.add(new Action() {
-          @Override
-          public void write(TProtocol out) throws TException {
-            out.writeI16(s);
-          }
+        @Override
+        public String toDebugString() {
+          return String.valueOf(d);
+        }
+      });
+      break;
+    case TType.I16:
+      final short s = in.readI16();
+      buffer.add(new Action() {
+        @Override
+        public void write(TProtocol out) throws TException {
+          out.writeI16(s);
+        }
 
-          @Override
-          public String toDebugString() {
-            return String.valueOf(s);
-          }
-        });
-        break;
-      case TType.ENUM: // same as i32 => actually never seen in the protocol layer as enums are written as a i32 field
-      case TType.I32:
-        final int i = in.readI32();
-        buffer.add(new Action() {
-          @Override
-          public void write(TProtocol out) throws TException {
-            out.writeI32(i);
-          }
+        @Override
+        public String toDebugString() {
+          return String.valueOf(s);
+        }
+      });
+      break;
+    case TType.ENUM: // same as i32 => actually never seen in the protocol layer as enums are written as a i32 field
+    case TType.I32:
+      final int i = in.readI32();
+      buffer.add(new Action() {
+        @Override
+        public void write(TProtocol out) throws TException {
+          out.writeI32(i);
+        }
 
-          @Override
-          public String toDebugString() {
-            return String.valueOf(i);
-          }
-        });
-        break;
-      case TType.I64:
-        final long l = in.readI64();
-        buffer.add(new Action() {
-          @Override
-          public void write(TProtocol out) throws TException {
-            out.writeI64(l);
-          }
+        @Override
+        public String toDebugString() {
+          return String.valueOf(i);
+        }
+      });
+      break;
+    case TType.I64:
+      final long l = in.readI64();
+      buffer.add(new Action() {
+        @Override
+        public void write(TProtocol out) throws TException {
+          out.writeI64(l);
+        }
 
-          @Override
-          public String toDebugString() {
-            return String.valueOf(l);
-          }
-        });
-        break;
-      case TType.STRING:
-        final ByteBuffer bin = in.readBinary();
-        buffer.add(new Action() {
-          @Override
-          public void write(TProtocol out) throws TException {
-            out.writeBinary(bin);
-          }
+        @Override
+        public String toDebugString() {
+          return String.valueOf(l);
+        }
+      });
+      break;
+    case TType.STRING:
+      final ByteBuffer bin = in.readBinary();
+      buffer.add(new Action() {
+        @Override
+        public void write(TProtocol out) throws TException {
+          out.writeBinary(bin);
+        }
 
-          @Override
-          public String toDebugString() {
-            return String.valueOf(bin);
-          }
-        });
-        break;
-      case TType.VOID:
-        break;
-      default:
-        throw new TException("Unknown type: " + type);
+        @Override
+        public String toDebugString() {
+          return String.valueOf(bin);
+        }
+      });
+      break;
+    case TType.VOID:
+      break;
+    default:
+      throw new TException("Unknown type: " + type);
     }
   }
 
@@ -419,13 +419,17 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     String toDebugString();
   }
 
+  /**
+   * implements this class to handle errors encountered during reading and writing
+   * use {@link #registerErrorHandler(parquet.thrift.BufferedProtocolReadToWrite.ReadWriteErrorHandler)} to register a handler
+   */
   public static interface ReadWriteErrorHandler {
     /**
      * handle when a record can not be read due to an exception
      *
      * @param e
      */
-    void handleSkippedCorruptedRecords(RuntimeException e);
+    void handleSkippedCorruptedRecord(SkippableException e);
 
     /**
      * handle when a record that contains fields that are ignored, meaning that the schema provided does not cover all the columns in data
