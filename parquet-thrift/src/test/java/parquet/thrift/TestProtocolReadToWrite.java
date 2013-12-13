@@ -30,10 +30,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.thrift.protocol.TField;
 import parquet.thrift.test.compat.StructV2;
 import parquet.thrift.test.compat.StructV3;
+import parquet.thrift.test.compat.StructV4WithExtracStructField;
 import thrift.test.OneOfEach;
 
 import org.apache.thrift.TBase;
@@ -166,11 +166,10 @@ public class TestProtocolReadToWrite {
     }
   }
 
-  //TODO clear handler
   @Test
-  public void testMissingField() throws Exception {
+  public void testMissingFieldHandling() throws Exception {
     //write using StructV3
-    BufferedProtocolReadToWrite p = new BufferedProtocolReadToWrite(new ThriftSchemaConverter().toStructType(StructV2.class));
+    BufferedProtocolReadToWrite p = new BufferedProtocolReadToWrite(new ThriftSchemaConverter().toStructType(StructV3.class));
     //handler will rethrow the exception for verifying purpose
 
     CountingErrorHandler countingHandler= new CountingErrorHandler();
@@ -178,9 +177,14 @@ public class TestProtocolReadToWrite {
     p.registerErrorHandler(countingHandler);
 
     final ByteArrayOutputStream in = new ByteArrayOutputStream();
-    StructV3 dataWithNewSchema= new StructV3("name");
+    StructV4WithExtracStructField dataWithNewSchema= new StructV4WithExtracStructField("name");
     dataWithNewSchema.setAge("10");
     dataWithNewSchema.setGender("male");
+
+    StructV3 structV3=new StructV3("name");
+    structV3.setAge("10");
+
+    dataWithNewSchema.setAddedStruct(structV3);
     dataWithNewSchema.write(protocol(in));
     //read using StructV2
     final ByteArrayOutputStream out = new ByteArrayOutputStream();
