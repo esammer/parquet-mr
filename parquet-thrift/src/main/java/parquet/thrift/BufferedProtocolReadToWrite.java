@@ -31,6 +31,13 @@ import java.util.List;
 
 /**
  * Class to read from one protocol in a buffer and then write to another one
+ * When there is an exception during reading, it's a skippable exception.
+ * When schema is not compatible, the {@link SkippableException} will be passed to {@link ReadWriteErrorHandler#handleSkippedCorruptedRecord(SkippableException)}.
+ *
+ * When there are fields in the data that are not defined in the schema, the fields will be ignored and the handler will
+ * be notified through {@link ReadWriteErrorHandler#handleFieldIgnored(org.apache.thrift.protocol.TField)}
+ * and {@link parquet.thrift.BufferedProtocolReadToWrite.ReadWriteErrorHandler#handleRecordHasFieldIgnored()}
+ *
  *
  * @author Julien Le Dem
  */
@@ -116,8 +123,9 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
    *
    * @param in  input protocol
    * @param out output protocol
-   * @throws TException         when an error happened while writing. Those are usualy not recoverable
+   * @throws TException         when an error happened while writing. Those are usually not recoverable
    * @throws SkippableException when an error happened while reading. Ignoring those will skip the bad records.
+   * reference {@link ReadWriteErrorHandler} to implement error handling procedure when SkippableException is thrown
    */
   @Override
   public void readOne(TProtocol in, TProtocol out) throws TException {
