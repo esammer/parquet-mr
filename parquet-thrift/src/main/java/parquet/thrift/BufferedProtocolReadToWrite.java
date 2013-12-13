@@ -102,11 +102,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     this.thriftType = thriftType;
   }
 
-  /**
-   * method chaining style
-   *
-   * @param errorHandler
-   */
   public static void registerErrorHandler(ReadWriteErrorHandler errorHandler) {
     errorHandlers.add(errorHandler);
   }
@@ -134,7 +129,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
         notifyRecordHasFieldIgnored();
       }
     } catch (Exception e) {
-      notifySkippedCorruptedRecord(new SkippableException(error("Error while reading", buffer), e));  //TODO notify handler about corrupted record
+      notifySkippedCorruptedRecord(new SkippableException(error("Error while reading", buffer), e));
       return;
     }
     try {
@@ -326,8 +321,8 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       if (field.id > type.getChildren().size()) {
         notifyIgnoredFieldsOfRecord(field);
         hasFieldIgnored = true;
-        //read the value and ignore it, DummyTProtocol will do nothing
-        new ProtocolReadToWrite().readOneValue(in, new DummyTProtocol(), field.type);
+        //read the value and ignore it, NullProtocol will do nothing
+        new ProtocolReadToWrite().readOneValue(in, new NullProtocol(), field.type);
         continue;
       }
       buffer.add(new Action() {
@@ -445,9 +440,12 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     void handleFieldIgnored(TField field);
   }
 
-  class DummyTProtocol extends TProtocol {
+  /**
+   * NullProtocol does nothing when writing to it, used for ignoring unrecognized fields.
+   */
+  class NullProtocol extends TProtocol {
 
-    public DummyTProtocol() {
+    public NullProtocol() {
       super(null);
     }
 
