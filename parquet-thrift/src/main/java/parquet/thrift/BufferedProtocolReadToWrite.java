@@ -44,6 +44,11 @@ import parquet.thrift.struct.ThriftTypeID;
  */
 public class BufferedProtocolReadToWrite implements ProtocolPipe {
 
+  private interface Action {
+    void write(TProtocol out) throws TException;
+    String toDebugString();
+  }
+
   private static final Action STRUCT_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -56,6 +61,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return ")";
     }
   };
+
   private static final Action FIELD_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -66,6 +72,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return ";";
     }
   };
+
   private static final Action MAP_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -76,6 +83,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return "]";
     }
   };
+
   private static final Action LIST_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -86,6 +94,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return "}";
     }
   };
+
   private static final Action SET_END = new Action() {
     @Override
     public void write(TProtocol out) throws TException {
@@ -96,6 +105,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       return "*}";
     }
   };
+
   private final StructType thriftType;
   boolean hasFieldIgnored=false;
   //error handlers are global
@@ -376,7 +386,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       public void write(TProtocol out) throws TException {
         out.writeSetBegin(set);
       }
-
       @Override
       public String toDebugString() {
         return "<e=" + set.elemType + ", s=" + set.size + ">{*";
@@ -394,7 +403,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       public void write(TProtocol out) throws TException {
         out.writeListBegin(list);
       }
-
       @Override
       public String toDebugString() {
         return "<e=" + list.elemType + ", s=" + list.size + ">{";
@@ -410,12 +418,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     for (int i = 0; i < size; i++) {
       readOneValue(in, elemType, buffer, expectedType);
     }
-  }
-
-  private interface Action {
-    void write(TProtocol out) throws TException;
-
-    String toDebugString();
   }
 
   public static interface ReadWriteErrorHandler {

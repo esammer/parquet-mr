@@ -23,7 +23,6 @@ import org.apache.thrift.protocol.TProtocolFactory;
 
 import parquet.hadoop.ParquetOutputFormat;
 import parquet.hadoop.util.ContextUtil;
-import parquet.thrift.BufferedProtocolReadToWrite;
 
 /**
  * Output format that turns Thrift bytes into Parquet format using the thrift TProtocol layer
@@ -44,11 +43,6 @@ public class ParquetThriftBytesOutputFormat extends ParquetOutputFormat<BytesWri
 
   public static <U extends TProtocol> void setTProtocolClass(Job job, Class<U> tProtocolClass) {
     ThriftBytesWriteSupport.setTProtocolClass(ContextUtil.getConfiguration(job), tProtocolClass);
-  }
-
-  //Set the error handler
-  public static void setErrorHandler(BufferedProtocolReadToWrite.ReadWriteErrorHandler handler) {
-    BufferedProtocolReadToWrite.registerErrorHandler(handler);
   }
 
   /**
