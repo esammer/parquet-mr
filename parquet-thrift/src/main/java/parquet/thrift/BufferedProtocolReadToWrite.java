@@ -174,16 +174,16 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     }
     switch (type) {
     case TType.LIST:
-      readOneList(in, buffer, (ListType) expectedType);
+      readOneList(in, buffer, (ListType)expectedType);
       break;
     case TType.MAP:
-      readOneMap(in, buffer, (MapType) expectedType);
+      readOneMap(in, buffer, (MapType)expectedType);
       break;
     case TType.SET:
-      readOneSet(in, buffer, (SetType) expectedType);
+      readOneSet(in, buffer, (SetType)expectedType);
       break;
     case TType.STRUCT:
-      readOneStruct(in, buffer, (StructType) expectedType);
+      readOneStruct(in, buffer, (StructType)expectedType);
       break;
     case TType.STOP:
       break;
@@ -443,6 +443,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
      * handle when a field gets ignored,
      * notice the difference between this method and {@link #handleRecordHasFieldIgnored()} is that:
      * for one record, this method maybe called many times when there are multiple fields not defined in the schema.
+     *
      * @param field
      */
     void handleFieldIgnored(TField field);
