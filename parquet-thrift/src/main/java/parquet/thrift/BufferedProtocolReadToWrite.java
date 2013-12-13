@@ -332,7 +332,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       final TField currentField = field;
       if (field.id > type.getChildren().size()) {
         notifyIgnoredFieldsOfRecord(field);
-        hasFieldsIgnored = true;
+        hasFieldsIgnored |= true;
         //read the value and ignore it, NullProtocol will do nothing
         new ProtocolReadToWrite().readOneValue(in, new NullProtocol(), field.type);
         continue;
@@ -350,7 +350,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       });
       ThriftField expectedField = type.getChildById(field.id);
       try {
-        hasFieldsIgnored = readOneValue(in, field.type, buffer, expectedField.getType());
+        hasFieldsIgnored |= readOneValue(in, field.type, buffer, expectedField.getType());
       } catch (Exception e) {
         throw new TException("Error while reading field " + field + " expected " + expectedField, e);
       }
@@ -420,7 +420,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
   }
 
   private void readCollectionElements(TProtocol in,
-                                      final int size, final byte elemType, List<Action> buffer, ThriftType expectedType) throws TException {
+      final int size, final byte elemType, List<Action> buffer, ThriftType expectedType) throws TException {
     for (int i = 0; i < size; i++) {
       readOneValue(in, elemType, buffer, expectedType);
     }
