@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.thrift.protocol.TField;
-import parquet.thrift.test.compat.StructV2;
 import parquet.thrift.test.compat.StructV3;
 import parquet.thrift.test.compat.StructV4WithExtracStructField;
 import thrift.test.OneOfEach;
@@ -117,7 +116,7 @@ public class TestProtocolReadToWrite {
   @Test
   public void testIncompatibleRecord() throws Exception {
     BufferedProtocolReadToWrite p = new BufferedProtocolReadToWrite(new ThriftSchemaConverter().toStructType(AddressBook.class));
-    p.unregisterAllHandlers();
+    p.unregisterAllErrorHandlers();
     //handler will rethrow the exception for verifying purpose
     p.registerErrorHandler(new BufferedProtocolReadToWrite.ReadWriteErrorHandler() {
       @Override
@@ -146,26 +145,6 @@ public class TestProtocolReadToWrite {
     }
   }
 
-  class CountingErrorHandler implements BufferedProtocolReadToWrite.ReadWriteErrorHandler{
-     int corruptedCount=0;
-     int fieldIgnoredCount=0;
-     int recordCountOfMissingFields=0;
-    @Override
-    public void handleSkippedCorruptedRecord(SkippableException e) {
-      corruptedCount++;
-    }
-
-    @Override
-    public void handleRecordHasFieldIgnored() {
-      recordCountOfMissingFields++;
-    }
-
-    @Override
-    public void handleFieldIgnored(TField field) {
-      fieldIgnoredCount++;
-    }
-  }
-
   @Test
   public void testMissingFieldHandling() throws Exception {
     //write using StructV3
@@ -173,7 +152,7 @@ public class TestProtocolReadToWrite {
     //handler will rethrow the exception for verifying purpose
 
     CountingErrorHandler countingHandler= new CountingErrorHandler();
-    p.unregisterAllHandlers();
+    p.unregisterAllErrorHandlers();
     p.registerErrorHandler(countingHandler);
 
     final ByteArrayOutputStream in = new ByteArrayOutputStream();
@@ -192,6 +171,27 @@ public class TestProtocolReadToWrite {
     assertEquals(0,countingHandler.corruptedCount);
     assertEquals(1,countingHandler.recordCountOfMissingFields);
     assertEquals(1,countingHandler.fieldIgnoredCount);
+  }
+
+
+  class CountingErrorHandler implements BufferedProtocolReadToWrite.ReadWriteErrorHandler{
+     int corruptedCount=0;
+     int fieldIgnoredCount=0;
+     int recordCountOfMissingFields=0;
+    @Override
+    public void handleSkippedCorruptedRecord(SkippableException e) {
+      corruptedCount++;
+    }
+
+    @Override
+    public void handleRecordHasFieldIgnored() {
+      recordCountOfMissingFields++;
+    }
+
+    @Override
+    public void handleFieldIgnored(TField field) {
+      fieldIgnoredCount++;
+    }
   }
 
   private TCompactProtocol protocol(OutputStream to) {

@@ -102,7 +102,6 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
   //error handlers are global
   private static List<ReadWriteErrorHandler> errorHandlers = new LinkedList<ReadWriteErrorHandler>();
   private final StructType thriftType;
-  boolean hasFieldIgnored = false;
 
   public BufferedProtocolReadToWrite(StructType thriftType) {
     super();
@@ -113,7 +112,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     errorHandlers.add(errorHandler);
   }
 
-  public static void unregisterAllHandlers() {
+  public static void unregisterAllErrorHandlers() {
     errorHandlers = new LinkedList<ReadWriteErrorHandler>();
   }
 
@@ -130,10 +129,9 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
   @Override
   public void readOne(TProtocol in, TProtocol out) throws TException {
     List<Action> buffer = new LinkedList<Action>();
-    hasFieldIgnored = false;
     try {
-      readOneStruct(in, buffer, thriftType);
-      if (hasFieldIgnored) {
+      boolean hasFieldsIgnored = readOneStruct(in, buffer, thriftType);
+      if (hasFieldsIgnored) {
         notifyRecordHasFieldIgnored();
       }
     } catch (Exception e) {
@@ -175,11 +173,16 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     return sb.toString();
   }
 
-  private void readOneValue(TProtocol in, byte type, List<Action> buffer, ThriftType expectedType)
+  /**
+   * @return true when all value is consumed, false when some values is ignored due to the field is not defined in expectedType
+   * @throws TException
+   */
+  private boolean readOneValue(TProtocol in, byte type, List<Action> buffer, ThriftType expectedType)
           throws TException {
     if (expectedType != null && expectedType.getType().getSerializedThriftType() != type) {
       throw new TException("the data type does not match the expected thrift structure: expected " + expectedType + " got " + typeName(type));
     }
+    boolean hasFieldsIgnored = false;
     switch (type) {
     case TType.LIST:
       readOneList(in, buffer, (ListType)expectedType);
@@ -191,7 +194,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       readOneSet(in, buffer, (SetType)expectedType);
       break;
     case TType.STRUCT:
-      readOneStruct(in, buffer, (StructType)expectedType);
+      hasFieldsIgnored = readOneStruct(in, buffer, (StructType)expectedType);
       break;
     case TType.STOP:
       break;
@@ -299,6 +302,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     default:
       throw new TException("Unknown type: " + type);
     }
+    return hasFieldsIgnored;
   }
 
   private String typeName(byte type) {
@@ -309,7 +313,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     }
   }
 
-  private void readOneStruct(TProtocol in, List<Action> buffer, StructType type) throws TException {
+  private boolean readOneStruct(TProtocol in, List<Action> buffer, StructType type) throws TException {
     final TStruct struct = in.readStructBegin();
     buffer.add(new Action() {
       @Override
@@ -323,12 +327,12 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       }
     });
     TField field;
-
+    boolean hasFieldsIgnored = false;
     while ((field = in.readFieldBegin()).type != TType.STOP) {
       final TField currentField = field;
       if (field.id > type.getChildren().size()) {
         notifyIgnoredFieldsOfRecord(field);
-        hasFieldIgnored = true;
+        hasFieldsIgnored = true;
         //read the value and ignore it, NullProtocol will do nothing
         new ProtocolReadToWrite().readOneValue(in, new NullProtocol(), field.type);
         continue;
@@ -346,7 +350,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
       });
       ThriftField expectedField = type.getChildById(field.id);
       try {
-        readOneValue(in, field.type, buffer, expectedField.getType());
+        hasFieldsIgnored = readOneValue(in, field.type, buffer, expectedField.getType());
       } catch (Exception e) {
         throw new TException("Error while reading field " + field + " expected " + expectedField, e);
       }
@@ -355,6 +359,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     }
     in.readStructEnd();
     buffer.add(STRUCT_END);
+    return hasFieldsIgnored;
   }
 
   private void readOneMap(TProtocol in, List<Action> buffer, MapType mapType) throws TException {
