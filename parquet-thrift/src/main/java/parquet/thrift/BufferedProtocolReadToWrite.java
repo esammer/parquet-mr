@@ -421,10 +421,21 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
   }
 
   public static interface ReadWriteErrorHandler {
+    /**
+     * handle when a record can not be read due to an exception
+     * @param e
+     */
     void handleSkippedCorruptedRecords(RuntimeException e);
 
+    /**
+     * handle when a record that contains fields that are ignored, meaning that the schema provided does not cover all the columns in data
+     */
     void handleRecordHasFieldIgnored();
 
+    /**
+     * handle when a field gets ignored
+     * @param field
+     */
     void handleFieldIgnored(TField field);
     // corrupted record: throw new SkippableException(error("Error while reading", buffer), e);
   }
