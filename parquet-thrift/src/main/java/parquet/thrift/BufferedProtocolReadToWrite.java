@@ -185,13 +185,13 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     boolean hasFieldsIgnored = false;
     switch (type) {
     case TType.LIST:
-      readOneList(in, buffer, (ListType)expectedType);
+      hasFieldsIgnored = readOneList(in, buffer, (ListType)expectedType);
       break;
     case TType.MAP:
-      readOneMap(in, buffer, (MapType)expectedType);
+      hasFieldsIgnored = readOneMap(in, buffer, (MapType)expectedType);
       break;
     case TType.SET:
-      readOneSet(in, buffer, (SetType)expectedType);
+      hasFieldsIgnored = readOneSet(in, buffer, (SetType)expectedType);
       break;
     case TType.STRUCT:
       hasFieldsIgnored = readOneStruct(in, buffer, (StructType)expectedType);
@@ -362,7 +362,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     return hasFieldsIgnored;
   }
 
-  private void readOneMap(TProtocol in, List<Action> buffer, MapType mapType) throws TException {
+  private boolean readOneMap(TProtocol in, List<Action> buffer, MapType mapType) throws TException {
     final TMap map = in.readMapBegin();
     buffer.add(new Action() {
       @Override
@@ -375,15 +375,17 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
         return "<k=" + map.keyType + ", v=" + map.valueType + ", s=" + map.size + ">[";
       }
     });
+    boolean hasFieldIgnored = false;
     for (int i = 0; i < map.size; i++) {
-      readOneValue(in, map.keyType, buffer, mapType.getKey().getType());
-      readOneValue(in, map.valueType, buffer, mapType.getValue().getType());
+      hasFieldIgnored |= readOneValue(in, map.keyType, buffer, mapType.getKey().getType());
+      hasFieldIgnored |= readOneValue(in, map.valueType, buffer, mapType.getValue().getType());
     }
     in.readMapEnd();
     buffer.add(MAP_END);
+    return hasFieldIgnored;
   }
 
-  private void readOneSet(TProtocol in, List<Action> buffer, SetType expectedType) throws TException {
+  private boolean readOneSet(TProtocol in, List<Action> buffer, SetType expectedType) throws TException {
     final TSet set = in.readSetBegin();
     buffer.add(new Action() {
       @Override
@@ -396,12 +398,14 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
         return "<e=" + set.elemType + ", s=" + set.size + ">{*";
       }
     });
-    readCollectionElements(in, set.size, set.elemType, buffer, expectedType.getValues().getType());
+
+    boolean hasFieldsIgnored = readCollectionElements(in, set.size, set.elemType, buffer, expectedType.getValues().getType());
     in.readSetEnd();
     buffer.add(SET_END);
+    return hasFieldsIgnored;
   }
 
-  private void readOneList(TProtocol in, List<Action> buffer, ListType expectedType) throws TException {
+  private boolean readOneList(TProtocol in, List<Action> buffer, ListType expectedType) throws TException {
     final TList list = in.readListBegin();
     buffer.add(new Action() {
       @Override
@@ -414,16 +418,19 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
         return "<e=" + list.elemType + ", s=" + list.size + ">{";
       }
     });
-    readCollectionElements(in, list.size, list.elemType, buffer, expectedType.getValues().getType());
+    boolean hasFieldsIgnored = readCollectionElements(in, list.size, list.elemType, buffer, expectedType.getValues().getType());
     in.readListEnd();
     buffer.add(LIST_END);
+    return hasFieldsIgnored;
   }
 
-  private void readCollectionElements(TProtocol in,
+  private boolean readCollectionElements(TProtocol in,
       final int size, final byte elemType, List<Action> buffer, ThriftType expectedType) throws TException {
+    boolean hasFieldIgnored = false;
     for (int i = 0; i < size; i++) {
-      readOneValue(in, elemType, buffer, expectedType);
+      hasFieldIgnored |= readOneValue(in, elemType, buffer, expectedType);
     }
+    return hasFieldIgnored;
   }
 
   private interface Action {
