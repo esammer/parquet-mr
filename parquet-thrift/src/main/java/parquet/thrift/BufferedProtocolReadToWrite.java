@@ -33,11 +33,10 @@ import java.util.List;
  * Class to read from one protocol in a buffer and then write to another one
  * When there is an exception during reading, it's a skippable exception.
  * When schema is not compatible, the {@link SkippableException} will be passed to {@link ReadWriteErrorHandler#handleSkippedCorruptedRecord(SkippableException)}.
- *
+ * <p/>
  * When there are fields in the data that are not defined in the schema, the fields will be ignored and the handler will
  * be notified through {@link ReadWriteErrorHandler#handleFieldIgnored(org.apache.thrift.protocol.TField)}
  * and {@link parquet.thrift.BufferedProtocolReadToWrite.ReadWriteErrorHandler#handleRecordHasFieldIgnored()}
- *
  *
  * @author Julien Le Dem
  */
@@ -100,7 +99,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     }
   };
   //error handlers are global
-  private static List<ReadWriteErrorHandler> errorHandlers = new LinkedList<ReadWriteErrorHandler>();
+  private static ReadWriteErrorHandler errorHandler;
   private final StructType thriftType;
 
   public BufferedProtocolReadToWrite(StructType thriftType) {
@@ -108,12 +107,12 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
     this.thriftType = thriftType;
   }
 
-  public static void registerErrorHandler(ReadWriteErrorHandler errorHandler) {
-    errorHandlers.add(errorHandler);
+  public static void registerErrorHandler(ReadWriteErrorHandler handler) {
+    errorHandler = handler;
   }
 
   public static void unregisterAllErrorHandlers() {
-    errorHandlers = new LinkedList<ReadWriteErrorHandler>();
+    errorHandler = null;
   }
 
   /**
@@ -124,7 +123,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
    * @param out output protocol
    * @throws TException         when an error happened while writing. Those are usually not recoverable
    * @throws SkippableException when an error happened while reading. Ignoring those will skip the bad records.
-   * reference {@link ReadWriteErrorHandler} to implement error handling procedure when SkippableException is thrown
+   *                            reference {@link ReadWriteErrorHandler} to implement error handling procedure when SkippableException is thrown
    */
   @Override
   public void readOne(TProtocol in, TProtocol out) throws TException {
@@ -148,19 +147,19 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
   }
 
   private void notifyRecordHasFieldIgnored() {
-    for (ReadWriteErrorHandler errorHandler : errorHandlers) {
+    if (errorHandler != null) {
       errorHandler.handleRecordHasFieldIgnored();
     }
   }
 
   private void notifySkippedCorruptedRecord(SkippableException e) {
-    for (ReadWriteErrorHandler errorHandler : errorHandlers) {
+    if (errorHandler != null) {
       errorHandler.handleSkippedCorruptedRecord(e);
     }
   }
 
   private void notifyIgnoredFieldsOfRecord(TField field) {
-    for (ReadWriteErrorHandler errorHandler : errorHandlers) {
+    if (errorHandler != null) {
       errorHandler.handleFieldIgnored(field);
     }
   }
@@ -425,7 +424,7 @@ public class BufferedProtocolReadToWrite implements ProtocolPipe {
   }
 
   private boolean readCollectionElements(TProtocol in,
-      final int size, final byte elemType, List<Action> buffer, ThriftType expectedType) throws TException {
+                                         final int size, final byte elemType, List<Action> buffer, ThriftType expectedType) throws TException {
     boolean hasFieldIgnored = false;
     for (int i = 0; i < size; i++) {
       hasFieldIgnored |= readOneValue(in, elemType, buffer, expectedType);
